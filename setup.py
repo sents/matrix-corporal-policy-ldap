@@ -14,20 +14,17 @@ setup(
     to assign users to their ldap groups.
     """,
     classifiers=[
-        "Programming Language :: Python :: 3.5",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.8"
     ],
     license="GNU AGPLv3",
-    install_requires=["ldap3"],
+    install_requires=["ldap3", "requests"],
     author="Finn Krein",
     author_email="finn@krein.moe",
     url='https://github.com/sents/matrix-corporal-policy-ldap',
     packages=["matrix_corporal_policy_ldap"],
     entry_points={
         "console_scripts": [
-            "corporal-policy-ldap.py = matrix_corporal_policy_ldap.generate_policy:main"
+            "corporal-policy-ldap.py = matrix_corporal_policy_ldap.__init__:main"
         ]
     },
 )
