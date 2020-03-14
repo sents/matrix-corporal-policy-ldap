@@ -3,11 +3,11 @@
 	"schema_version": 1,
 	"flags": {
 	    "allowCustomUserDisplayNames": true,
-	    "allowCustomUserAvatars": true}
+	    "allowCustomUserAvatars": true},
+	"user":{
+	    "authType": "rest",
+	    "authCredential": "http://localhost:8090"}
     },
-    "user_defaults":{
-	"authType": "rest",
-	"authCredential": "http://localhost:8090"},
     "user_mode": "existing",
     "homserver_domain_name": "matrix.domain.org",
     "homeserver_api_endpoint": "http://localhost:8008",
@@ -17,11 +17,11 @@
 	"url": "ldaps://ldapserver.domain.org",
 	"binddn": "uid=admin,ou=People,dc=domain,dc=org",
 	"binddn_pw": "swordfish",
+	"filter": "(objectClass=posixAccount)",
 	"scope": "LEVEL",
 	"user": {
 	    "base": "ou=People,dc=domain,dc=org",
 	    "id": "uid",
-	    "filter": "(objectClass=posixAccount)",
 	    "displayName": "cn"},
 	"group":{
 	    "base": "ou=Groups,dc=domain,dc=org",
@@ -38,7 +38,7 @@
 	    "group2"
 	]
     },
-    "rooms": ["room1", {"room_alias_name":"comm1room", "topic"}],
-    "communities": [{"ldap_uid": "some_uid", "localpart": "custom_localpart", "name": "custom_name_for_community", "rooms": ["room1"], "room_visibility": "private"}]
+    "rooms": ["room1", {"room_alias_name":"comm1room", "topic": "sometopic"}],
+    "communities": [{"ldap_uid": "someuid", "name": "custom_name_for_community", "rooms": ["room1"], "room_visibility": false}],
     "users": []
 }
