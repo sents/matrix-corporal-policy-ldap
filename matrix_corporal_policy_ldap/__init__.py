@@ -345,7 +345,7 @@ class PolicyConfig:
                 self.ldap["group"]["id"],
                 self.ldap["group"]["prefix"],
                 group["ldap_id"],
-                self.ldap["group"]["base"],
+                group.get("ldap_base", self.ldap["group"]["base"])
             )
             in user_result.memberof
         ]
