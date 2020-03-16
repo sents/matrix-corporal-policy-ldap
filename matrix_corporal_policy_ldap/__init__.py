@@ -352,6 +352,7 @@ class PolicyConfig:
         if groups_and_rooms:
             groups, roomlist = zip(*groups_and_rooms)
             rooms = list(set(room for group_rooms in roomlist for room in group_rooms))
+            groups = list(groups)
         else:
             groups, rooms = [], []
         policy.update(
