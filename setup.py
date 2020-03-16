@@ -13,14 +13,12 @@ setup(
     database are used to generate a policy document which can be read by matrix-corporal
     to assign users to their ldap groups.
     """,
-    classifiers=[
-        "Programming Language :: Python :: 3.8"
-    ],
+    classifiers=["Programming Language :: Python :: 3.8"],
     license="GNU AGPLv3",
     install_requires=["ldap3", "requests"],
     author="Finn Krein",
     author_email="finn@krein.moe",
-    url='https://github.com/sents/matrix-corporal-policy-ldap',
+    url="https://github.com/sents/matrix-corporal-policy-ldap",
     packages=["matrix_corporal_policy_ldap"],
     entry_points={
         "console_scripts": [
