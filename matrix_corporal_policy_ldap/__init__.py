@@ -7,7 +7,7 @@ from sys import stdout
 from copy import deepcopy
 from ldap3 import Connection
 from argparse import ArgumentParser
-from urllib.parse import urljoin
+from urllib.parse import urljoin, quote
 
 
 name = "matrix-corporal-policy-ldap"
@@ -57,12 +57,6 @@ def raise_if_no_suceed(req, message):
     raise requests.exceptions.HTTPError(
         message + f" Status: {req.status_code},Reason:{req.reason}"
     )
-
-
-def quote(url):
-    url = re.sub(":", "%3A", url)
-    url = re.sub("\\+", "%2B", url)
-    return url
 
 
 def default_json(jdef, jin):
