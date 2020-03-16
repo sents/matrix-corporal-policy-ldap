@@ -416,8 +416,11 @@ def main():
         if args.output is None:
             json.dump(policy, stdout)
         else:
-            with open(args.output, "w") as f:
-                json.dump(policy, f)
+            with open(args.output, "r") as f:
+                oldpolicy = json.load(f)
+            if policy != oldpolicy:
+                with open(args.output, "w") as f:
+                    json.dump(policy, f)
         if args.repeat is None:
             break
         else:
