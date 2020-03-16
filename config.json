@@ -3,11 +3,11 @@
 	"schema_version": 1,
 	"flags": {
 	    "allowCustomUserDisplayNames": true,
-	    "allowCustomUserAvatars": true},
-	"user":{
-	    "authType": "rest",
-	    "authCredential": "http://localhost:8090"}
+	    "allowCustomUserAvatars": true}
     },
+    "user_defaults":{
+	"authType": "rest",
+	"authCredential": "http://localhost:8090"}
     "user_mode": "existing",
     "homeserver_domain_name": "matrix.domain.org",
     "homeserver_api_endpoint": "http://localhost:8008",
@@ -19,14 +19,12 @@
 	"binddn_pw": "swordfish",
 	"filter": "(objectClass=posixAccount)",
 	"scope": "LEVEL",
-	"user": {
-	    "base": "ou=People,dc=domain,dc=org",
-	    "id": "uid",
-	    "displayName": "cn",},
-	"group":{
-	    "base": "ou=Groups,dc=domain,dc=org",
-	    "id": "cn",
-	    "prefix": "pre_"}
+	"user_base": "ou=People,dc=domain,dc=org",
+	"user_id": "uid",
+	"user_displayName": "cn",
+	"group_base": "ou=Groups,dc=domain,dc=org",
+	"group_id": "cn",
+	"group_prefix": "pre_"
     },
     "rooms": ["room1", {"room_alias_name":"comm1room", "topic": "sometopic"}],
     "communities": [{"ldap_id": "someuid", "name": "custom_name_for_community", "rooms": ["room1"], "room_visibility": "private"}],

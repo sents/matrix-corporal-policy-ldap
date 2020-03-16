@@ -22,10 +22,11 @@ config_defaults = {
     "user_mode": "existing",
     "ldap": {
         "scope": "LEVEL",
-        "user": {"filter": None, "avatar_uri": None},
-        "group": {"prefix": ""},
+        "user_filter": None,
+        "user_avatar_uri": None,
+        "group_prefix": "",
     },
-    "users": []
+    "users": [],
 }
 
 
@@ -302,12 +303,12 @@ class PolicyConfig:
             self.save_lookup()
 
     def get_users(self):
-        query = "({}=*)".format(self.ldap["user"]["id"])
-        if self.ldap["user"]["filter"] is not None:
-            query = "(& {} {})".format(query, self.ldap["user"]["filter"])
+        query = "({}=*)".format(self.ldap["user_id"])
+        if self.ldap["user_filter"] is not None:
+            query = "(& {} {})".format(query, self.ldap["user_filter"])
         self.rebind_ldap()
         self.ldap_connection.search(
-            self.ldap["user"]["base"],
+            self.ldap["user_base"],
             query,
             attributes=["*"],
             search_scope=self.ldap["scope"],
@@ -316,21 +317,19 @@ class PolicyConfig:
         if self.user_mode == "existing":
             existing_users = self.matrix_connection.get_matrix_users()
             users = [
-                user
-                for user in users
-                if user[self.ldap["user"]["id"]] in existing_users
+                user for user in users if user[self.ldap["user_id"]] in existing_users
             ]
         elif self.user_mode == "list":
-            users = [
-                user for user in users if user[self.ldap["user"]["id"]] in self.users
-            ]
+            users = [user for user in users if user[self.ldap["user_id"]] in self.users]
         return users
 
     def user_policy(self, user_result):
         policy = {**self.user_defaults}
-        username = user_result[self.ldap["user"]["id"]].value
-        display_name = user_result[self.ldap["user"]["displayName"]].value
-        if self.ldap["user"]["avatar_uri"] is None:
+        username = user_result[self.ldap["user_id"]].value
+        display_name = user_result[
+            self.ldap.get("user_displayname", self.ldap["user_id"])
+        ].value
+        if self.ldap["user_avatar_uri"] is None:
             avatar_uri = ""
         else:
             avatar_uri = user_result[self.user["avatarUri"]]
@@ -342,10 +341,10 @@ class PolicyConfig:
             )
             for group in self.groups
             if "{}={}{},{}".format(
-                self.ldap["group"]["id"],
-                self.ldap["group"]["prefix"],
+                self.ldap["group_id"],
+                self.ldap["group_prefix"],
                 group["ldap_id"],
-                group.get("ldap_base", self.ldap["group"]["base"])
+                group.get("ldap_base", self.ldap["group_base"]),
             )
             in user_result.memberof
         ]
