@@ -36,17 +36,8 @@ config_defaults = {
 preset_types = ["private_chat", "trusted_private_chat", "public_chat"]
 
 
-def raise_if_no_suceed(req, message):
-    if req.status_code == 200:
-        return req
-    elif req.status_code == 429 and req.json()["errcode"] == "M_LIMIT_EXCEEDED":
-        time.sleep(req.json()["retry_after_ms"] / 1000)
-        newreq = requests.sessions.session().send(req.request)
-        newreq = raise_if_no_suceed(newreq, message)
-        return newreq
-    raise requests.exceptions.HTTPError(
-        message + f" Status: {req.status_code},Reason:{req.reason}"
-    )
+class MatrixCorporalPolicyLdapError(Exception):
+    pass
 
 
 def default_json(jdef, jin):
@@ -65,7 +56,7 @@ def default_json(jdef, jin):
 class MConnection:
     endpoints = {
         "list_users": "/_synapse/admin/v2/users?from=0",
-        "query_user": "/_synapse/admin/v2/users/",
+        "query_user": "/_synapse/admin/v2/users/{user_id}",
         "create_room": "/_matrix/client/r0/createRoom",
         "create_group": "/_matrix/client/r0/create_group",
         "groups_of_room": "/_matrix/client/r0/rooms/{room_id}/state/m.room.related_groups/",
@@ -81,8 +72,36 @@ class MConnection:
 
         self.user_regex = self.username_regex + re.escape(servername)
 
+        # set a default base for the url
         self.session = sessions.BaseUrlSession(base_url=address)
+        # set auth_header as default
         self.session.headers.update(self.auth_header)
+        # retry all 429 error codes
+        adapter = HTTPAdapter(
+            max_retries=Retry(total=3, status_forcelist=[429], raise_on_status=False)
+        )
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
+        # check non 4XX or 5XX status code on each response
+        self.session.hooks["response"] = [
+            lambda response, *args, **kwargs: response.raise_for_status()
+        ]
+
+    def _get(endpoint, message, *args, **kwargs):
+        try:
+            self.session.get(endpoint, *args, **kwargs)
+        except requests.exceptions.HTTPError as e:
+            raise MatrixCorporalPolicyLdapError(
+                message + f" Status: {e.request.status_code},Reason:{e.request.reason}"
+            )
+
+    def _post(endpoint, message, *args, **kwargs):
+        try:
+            self.session.post(endpoint, *args, **kwargs)
+        except requests.exceptions.HTTPError as e:
+            raise MatrixCorporalPolicyLdapError(
+                message + f" Status: {e.request.status_code},Reason:{e.request.reason}"
+            )
 
     def user_id(self, username):
         return f"@{username}:{self.servername}"
@@ -91,8 +110,7 @@ class MConnection:
         return f"+{groupname}:{self.servername}"
 
     def get_matrix_users(self):
-        req = self.session.get(self.endpoints["list_users"])
-        req = raise_if_no_suceed(req, "Failed to fetch userlist.")
+        req = self._get(self.endpoints["list_users"], "Failed to fetch userlist.")
         users = [
             userdic["name"]
             for userdic in req.json()["users"]
@@ -106,8 +124,10 @@ class MConnection:
         return users
 
     def query_matrix_user(self, user_id):
-        req = self.session.get(self.endpoints["query_user"] + "/" + quote(user_id))
-        req = raise_if_no_suceed(req, "Failed to query user.")
+        req = self._get(
+            self.endpoints["query_user"].format(user_id=quote(user_id)),
+            "Failed to query user."
+        )
         return req.json()
 
     def last_seen_user(self, user_id):
@@ -123,37 +143,42 @@ class MConnection:
         return last_seen
 
     def get_groups_of_room(self, room_id):
-        req = self.session.get(
-            self.endpoints["groups_of_room"].format(room_id=quote(room_id))
-        )
-        if req.status_code == 404:
-            return []
-        req = raise_if_no_suceed(req, "Failed to get groups of room.")
-        return req.json()["groups"]
+        try:
+            req = self.session.get(
+                self.endpoints["groups_of_room"].format(room_id=quote(room_id))
+            )
+            return req.json()["groups"]
+        except requests.exceptions.HTTPError as e:
+            if req.status_code == 404:
+                return []
+            else:
+                raise MatrixCorporalPolicyLdapError(
+                f"Failed to get groups of room. Status: {e.request.status_code},Reason:{e.request.reason}"
+            )
 
     def get_rooms_of_group(self, group_id):
-        req = self.session.get(
-            self.endpoints["rooms_of_group"].format(group_id=quote(group_id))
+        req = self._get(
+            self.endpoints["rooms_of_group"].format(group_id=quote(group_id)),
+            "Failed to get rooms of group.",
         )
-        req = raise_if_no_suceed(req, "Failed to get rooms of group.")
         return [room["room_id"] for room in req.json()["chunk"]]
 
     def create_room(self, room_params):
         req = self.session.post(
             self.endpoints["create_room"],
+            "Failed to create room.",
             headers={"Content-Type": "application/json"},
             json=room_params,
         )
-        req = raise_if_no_suceed(req, "Failed to create room.")
         return req.json()["room_id"]
 
     def create_group(self, group_params):
         req = self.session.post(
             self.endpoints["create_group"],
+            "Failed to create group.",
             headers={"Content-Type": "application/json"},
             json=group_params,
         )
-        req = raise_if_no_suceed(req, "Failed to create group.")
         return req.json()["group_id"]
 
     def add_room_to_group(self, group_id, room_id, visibility):
@@ -162,19 +187,19 @@ class MConnection:
                 group_id = quote(group_id),
                 room_id = quote(room_id),
             ),
+            "Failed to add room to group.",
             headers={**self.auth_header, "Content-Type": "application/json",},
             json={"m.visibility": {"type": visibility}},
         )
-        req = raise_if_no_suceed(req, "Failed to add room to group.")
 
         old_groups = self.get_groups_of_room(room_id)
         if group_id not in old_groups:
             req = requests.put(
                 self.endpoints["groups_of_room"].format(room_id=quote(room_id)),
+                "Failed to add group to room.",
                 headers={**self.auth_header, "Content-Type": "application/json",},
                 json={"groups": old_groups + [group_id]},
             )
-            req = raise_if_no_suceed(req, "Failed to add group to room.")
 
 
 class PolicyConfig:
