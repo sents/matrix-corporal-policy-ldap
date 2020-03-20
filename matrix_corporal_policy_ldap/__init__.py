@@ -28,16 +28,6 @@ config_defaults = {
 }
 
 
-endpoints = {
-    "list_users": "/_synapse/admin/v2/users?from=0",
-    "query_user": "/_synapse/admin/v2/users/",
-    "create_room": "/_matrix/client/r0/createRoom",
-    "create_group": "/_matrix/client/r0/create_group",
-    "groups_of_room": ["/_matrix/client/r0/rooms/", "state/m.room.related_groups/"],
-    "rooms_to_group": ["/_matrix/client/r0/groups/", "admin/rooms/"],
-    "rooms_of_group": ["/_matrix/client/r0/groups/", "rooms"],
-}
-username_regex = "@([a-z0-9._=\\-\\/]+):"
 preset_types = ["private_chat", "trusted_private_chat", "public_chat"]
 
 
@@ -68,11 +58,23 @@ def default_json(jdef, jin):
 
 
 class MConnection:
+    endpoints = {
+        "list_users": "/_synapse/admin/v2/users?from=0",
+        "query_user": "/_synapse/admin/v2/users/",
+        "create_room": "/_matrix/client/r0/createRoom",
+        "create_group": "/_matrix/client/r0/create_group",
+        "groups_of_room": "/_matrix/client/r0/rooms/{room_id}/state/m.room.related_groups/",
+        "rooms_to_group": "/_matrix/client/r0/groups/{group_id}/admin/rooms/{room_id}",
+        "rooms_of_group": "/_matrix/client/r0/groups/{group_id}/rooms",
+    }
+    username_regex = "@([a-z0-9._=\\-\\/]+):"
+
     def __init__(self, address, servername, token):
         self.address = address
         self.servername = servername
         self.auth_header = {"Authorization": f"Bearer {token}"}
-        self.user_regex = username_regex + re.escape(servername)
+
+        self.user_regex = self.username_regex + re.escape(servername)
 
     def user_id(self, username):
         return f"@{username}:{self.servername}"
