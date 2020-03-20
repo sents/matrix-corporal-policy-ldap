@@ -10,8 +10,6 @@ from argparse import ArgumentParser
 from urllib.parse import urljoin, quote
 
 
-name = "matrix-corporal-policy-ldap"
-
 config_defaults = {
     "corporal": {
         "schemaVersion": 1,
@@ -41,9 +39,6 @@ endpoints = {
 }
 username_regex = "@([a-z0-9._=\\-\\/]+):"
 preset_types = ["private_chat", "trusted_private_chat", "public_chat"]
-user_modes = ["existing", "all", "list"]
-
-days_to_milliseconds = 24 * 60 * 60 * 1000
 
 
 def raise_if_no_suceed(req, message):
