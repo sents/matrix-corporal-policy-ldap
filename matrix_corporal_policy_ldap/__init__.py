@@ -1,15 +1,19 @@
 import re
 import time
 import json
+
 import requests
-from requests_toolbelt import sessions
+
 from os import path
 from sys import stdout
 from copy import deepcopy
-from ldap3 import Connection
 from argparse import ArgumentParser
 from urllib.parse import urljoin, quote
 
+from ldap3 import Connection
+from requests_toolbelt import sessions
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 config_defaults = {
     "corporal": {
