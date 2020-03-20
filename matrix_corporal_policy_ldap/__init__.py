@@ -193,52 +193,52 @@ class MConnection:
             req = raise_if_no_suceed(req, "Failed to add group to room.")
 
 
-def defaults_room(room):
-    oroom = {
-        "topic": "",
-        "preset": "private_chat",
-        "creation_content": {"m.federate": False},
-    }
-    if type(room) == dict:
-        oroom.update(name=room["room_alias_name"])
-        oroom.update(**room)
-    else:
-        oroom.update(**{"room_alias_name": room, "name": room})
-    assert oroom["preset"] in preset_types, "Invalid room preset!"
-    return oroom
-
-
-def defaults_group(group):
-    if type(group) == dict:
-        data = {"profile": {}}
-        data.update(localpart=group.get("localpart", group["ldap_id"]))
-        data["profile"].update(name=group.get("name", group["ldap_id"]))
-        ogroup = {
-            "ldap_id": group["ldap_id"],
-            "rooms": group.get("rooms", []),
-            "room_visibility": group.get("room_visibility", "private"),
-            "localpart": data["localpart"],
-        }
-    else:
-        ogroup = {
-            "ldap_id": group,
-            "localpart": group,
-            "room_visibility": "private",
-            "rooms": [],
-        }
-        data = {"localpart": group, "profile": {"name": group}}
-    ogroup["data"] = data
-    return ogroup
-
-
 class PolicyConfig:
+    @staticmethod
+    def defaults_room(room):
+        oroom = {
+            "topic": "",
+            "preset": "private_chat",
+            "creation_content": {"m.federate": False},
+        }
+        if type(room) == dict:
+            oroom.update(name=room["room_alias_name"])
+            oroom.update(**room)
+        else:
+            oroom.update(**{"room_alias_name": room, "name": room})
+            assert oroom["preset"] in preset_types, "Invalid room preset!"
+            return oroom
+
+    @staticmethod
+    def defaults_group(group):
+        if type(group) == dict:
+            data = {"profile": {}}
+            data.update(localpart=group.get("localpart", group["ldap_id"]))
+            data["profile"].update(name=group.get("name", group["ldap_id"]))
+            ogroup = {
+                "ldap_id": group["ldap_id"],
+                "rooms": group.get("rooms", []),
+                "room_visibility": group.get("room_visibility", "private"),
+                "localpart": data["localpart"],
+            }
+        else:
+            ogroup = {
+                "ldap_id": group,
+                "localpart": group,
+                "room_visibility": "private",
+                "rooms": [],
+            }
+            data = {"localpart": group, "profile": {"name": group}}
+            ogroup["data"] = data
+            return ogroup
+
     def __init__(self, config):
         config = default_json(config_defaults, config)
         self.corporal = config["corporal"]
         self.ldap = config["ldap"]
         self.user_mode = config["user_mode"]
-        self.groups = [defaults_group(group) for group in config["communities"]]
-        self.rooms = [defaults_room(room) for room in config["rooms"]]
+        self.groups = [self.defaults_group(group) for group in config["communities"]]
+        self.rooms = [self.defaults_room(room) for room in config["rooms"]]
         self.user_defaults = config["user_defaults"]
         self.users = config["users"]
         self.lookup_path = config["lookup_path"]
