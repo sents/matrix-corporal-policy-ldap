@@ -2,6 +2,7 @@ import re
 import time
 import json
 import requests
+from requests_toolbelt import sessions
 from os import path
 from sys import stdout
 from copy import deepcopy
@@ -76,6 +77,9 @@ class MConnection:
 
         self.user_regex = self.username_regex + re.escape(servername)
 
+        self.session = sessions.BaseUrlSession(base_url=address)
+        self.session.headers.update(self.auth_header)
+
     def user_id(self, username):
         return f"@{username}:{self.servername}"
 
@@ -83,9 +87,7 @@ class MConnection:
         return f"+{groupname}:{self.servername}"
 
     def get_matrix_users(self):
-        req = requests.get(
-            urljoin(self.address, endpoints["list_users"]), headers=self.auth_header
-        )
+        req = self.session.get(self.endpoints["list_users"])
         req = raise_if_no_suceed(req, "Failed to fetch userlist.")
         users = [
             userdic["name"]
@@ -100,10 +102,7 @@ class MConnection:
         return users
 
     def query_matrix_user(self, user_id):
-        req = requests.get(
-            urljoin(self.address, path.join(endpoints["query_user"], quote(user_id))),
-            headers=self.auth_header,
-        )
+        req = self.session.get(self.endpoints["query_user"] + "/" + quote(user_id))
         req = raise_if_no_suceed(req, "Failed to query user.")
         return req.json()
 
@@ -120,75 +119,56 @@ class MConnection:
         return last_seen
 
     def get_groups_of_room(self, room_id):
-        req_address = urljoin(
-            self.address,
-            path.join(
-                endpoints["groups_of_room"][0],
-                quote(room_id),
-                endpoints["groups_of_room"][1],
-            ),
+        req = self.session.get(
+            self.endpoints["groups_of_room"].format(room_id=quote(room_id))
         )
-        req = requests.get(req_address, headers=self.auth_header)
         if req.status_code == 404:
             return []
         req = raise_if_no_suceed(req, "Failed to get groups of room.")
         return req.json()["groups"]
 
     def get_rooms_of_group(self, group_id):
-        req_address = urljoin(
-            self.address,
-            path.join(
-                endpoints["rooms_of_group"][0],
-                quote(group_id),
-                endpoints["rooms_of_group"][1],
-            ),
+        req = self.session.get(
+            self.endpoints["rooms_of_group"].format(group_id=quote(group_id))
         )
-        req = requests.get(req_address, headers=self.auth_header)
         req = raise_if_no_suceed(req, "Failed to get rooms of group.")
         return [room["room_id"] for room in req.json()["chunk"]]
 
     def create_room(self, room_params):
-        req = requests.post(
-            urljoin(self.address, endpoints["create_room"]),
-            headers={**self.auth_header, "Content-Type": "application/json"},
+        req = self.session.post(
+            self.endpoints["create_room"],
+            headers={"Content-Type": "application/json"},
             json=room_params,
         )
         req = raise_if_no_suceed(req, "Failed to create room.")
         return req.json()["room_id"]
 
     def create_group(self, group_params):
-        req = requests.post(
-            urljoin(self.address, endpoints["create_group"]),
-            headers={**self.auth_header, "Content-Type": "application/json"},
+        req = self.session.post(
+            self.endpoints["create_group"],
+            headers={"Content-Type": "application/json"},
             json=group_params,
         )
         req = raise_if_no_suceed(req, "Failed to create group.")
         return req.json()["group_id"]
 
     def add_room_to_group(self, group_id, room_id, visibility):
-        endpoint = endpoints["rooms_to_group"]
-        data = {"m.visibility": {"type": visibility}}
-        req_address = urljoin(
-            self.address,
-            path.join(endpoint[0], quote(group_id), endpoint[1], quote(room_id)),
-        )
         req = requests.put(
-            req_address,
+            self.endpoints["rooms_to_group"].format(
+                group_id = quote(group_id),
+                room_id = quote(room_id),
+            ),
             headers={**self.auth_header, "Content-Type": "application/json",},
-            json=data,
+            json={"m.visibility": {"type": visibility}},
         )
         req = raise_if_no_suceed(req, "Failed to add room to group.")
+
         old_groups = self.get_groups_of_room(room_id)
         if group_id not in old_groups:
-            endpoint = endpoints["groups_of_room"]
-            req_address = urljoin(
-                self.address, path.join(endpoint[0], quote(room_id), endpoint[1])
-            )
-            data = {"groups": old_groups + [group_id]}
             req = requests.put(
-                req_address,
+                self.endpoints["groups_of_room"].format(room_id=quote(room_id)),
                 headers={**self.auth_header, "Content-Type": "application/json",},
-                json=data,
+                json={"groups": old_groups + [group_id]},
             )
             req = raise_if_no_suceed(req, "Failed to add group to room.")
 
