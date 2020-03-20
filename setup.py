@@ -15,7 +15,7 @@ setup(
     """,
     classifiers=["Programming Language :: Python :: 3.8"],
     license="GNU AGPLv3",
-    install_requires=["ldap3", "requests"],
+    install_requires=["ldap3", "requests", "requests-toolbelt"],
     author="Finn Krein",
     author_email="finn@krein.moe",
     url="https://github.com/sents/matrix-corporal-policy-ldap",
