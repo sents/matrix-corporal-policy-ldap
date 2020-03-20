@@ -8,7 +8,8 @@ from os import path
 from sys import stdout
 from copy import deepcopy
 from argparse import ArgumentParser
-from urllib.parse import urljoin, quote
+from urllib.parse import urljoin
+from urllib.parse import quote as _quote
 
 from ldap3 import Connection
 from requests_toolbelt import sessions
@@ -38,6 +39,10 @@ preset_types = ["private_chat", "trusted_private_chat", "public_chat"]
 
 class MatrixCorporalPolicyLdapError(Exception):
     pass
+
+
+def quote(string):
+    return _quote(string, safe="@")
 
 
 def default_json(jdef, jin):
