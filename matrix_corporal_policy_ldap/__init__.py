@@ -1,16 +1,20 @@
 import re
 import time
 import json
+
 import requests
+
 from os import path
 from sys import stdout
 from copy import deepcopy
-from ldap3 import Connection
 from argparse import ArgumentParser
 from urllib.parse import urljoin
+from urllib.parse import quote as _quote
 
-
-name = "matrix-corporal-policy-ldap"
+from ldap3 import Connection
+from requests_toolbelt import sessions
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 config_defaults = {
     "corporal": {
@@ -30,39 +34,15 @@ config_defaults = {
 }
 
 
-endpoints = {
-    "list_users": "/_synapse/admin/v2/users?from=0",
-    "query_user": "/_synapse/admin/v2/users/",
-    "create_room": "/_matrix/client/r0/createRoom",
-    "create_group": "/_matrix/client/r0/create_group",
-    "groups_of_room": ["/_matrix/client/r0/rooms/", "state/m.room.related_groups/"],
-    "rooms_to_group": ["/_matrix/client/r0/groups/", "admin/rooms/"],
-    "rooms_of_group": ["/_matrix/client/r0/groups/", "rooms"],
-}
-username_regex = "@([a-z0-9._=\\-\\/]+):"
 preset_types = ["private_chat", "trusted_private_chat", "public_chat"]
-user_modes = ["existing", "all", "list"]
-
-days_to_milliseconds = 24 * 60 * 60 * 1000
 
 
-def raise_if_no_suceed(req, message):
-    if req.status_code == 200:
-        return req
-    elif req.status_code == 429 and req.json()["errcode"] == "M_LIMIT_EXCEEDED":
-        time.sleep(req.json()["retry_after_ms"] / 1000)
-        newreq = requests.sessions.session().send(req.request)
-        newreq = raise_if_no_suceed(newreq, message)
-        return newreq
-    raise requests.exceptions.HTTPError(
-        message + f" Status: {req.status_code},Reason:{req.reason}"
-    )
+class MatrixCorporalPolicyLdapError(Exception):
+    pass
 
 
-def quote(url):
-    url = re.sub(":", "%3A", url)
-    url = re.sub("\\+", "%2B", url)
-    return url
+def quote(string):
+    return _quote(string, safe="@")
 
 
 def default_json(jdef, jin):
@@ -79,11 +59,54 @@ def default_json(jdef, jin):
 
 
 class MConnection:
+    endpoints = {
+        "list_users": "/_synapse/admin/v2/users?from=0",
+        "query_user": "/_synapse/admin/v2/users/{user_id}",
+        "create_room": "/_matrix/client/r0/createRoom",
+        "create_group": "/_matrix/client/r0/create_group",
+        "groups_of_room": "/_matrix/client/r0/rooms/{room_id}/state/m.room.related_groups/",
+        "rooms_to_group": "/_matrix/client/r0/groups/{group_id}/admin/rooms/{room_id}",
+        "rooms_of_group": "/_matrix/client/r0/groups/{group_id}/rooms",
+    }
+    username_regex = "@([a-z0-9._=\\-\\/]+):"
+
     def __init__(self, address, servername, token):
         self.address = address
         self.servername = servername
         self.auth_header = {"Authorization": f"Bearer {token}"}
-        self.user_regex = username_regex + re.escape(servername)
+
+        self.user_regex = self.username_regex + re.escape(servername)
+
+        # set a default base for the url
+        self.session = sessions.BaseUrlSession(base_url=address)
+        # set auth_header as default
+        self.session.headers.update(self.auth_header)
+        # retry all 429 error codes
+        adapter = HTTPAdapter(
+            max_retries=Retry(total=3, status_forcelist=[429], raise_on_status=False)
+        )
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
+        # check non 4XX or 5XX status code on each response
+        self.session.hooks["response"] = [
+            lambda response, *args, **kwargs: response.raise_for_status()
+        ]
+
+    def _get(endpoint, message, *args, **kwargs):
+        try:
+            self.session.get(endpoint, *args, **kwargs)
+        except requests.exceptions.HTTPError as e:
+            raise MatrixCorporalPolicyLdapError(
+                message + f" Status: {e.request.status_code},Reason:{e.request.reason}"
+            )
+
+    def _post(endpoint, message, *args, **kwargs):
+        try:
+            self.session.post(endpoint, *args, **kwargs)
+        except requests.exceptions.HTTPError as e:
+            raise MatrixCorporalPolicyLdapError(
+                message + f" Status: {e.request.status_code},Reason:{e.request.reason}"
+            )
 
     def user_id(self, username):
         return f"@{username}:{self.servername}"
@@ -92,10 +115,7 @@ class MConnection:
         return f"+{groupname}:{self.servername}"
 
     def get_matrix_users(self):
-        req = requests.get(
-            urljoin(self.address, endpoints["list_users"]), headers=self.auth_header
-        )
-        req = raise_if_no_suceed(req, "Failed to fetch userlist.")
+        req = self._get(self.endpoints["list_users"], "Failed to fetch userlist.")
         users = [
             userdic["name"]
             for userdic in req.json()["users"]
@@ -109,11 +129,10 @@ class MConnection:
         return users
 
     def query_matrix_user(self, user_id):
-        req = requests.get(
-            urljoin(self.address, path.join(endpoints["query_user"], quote(user_id))),
-            headers=self.auth_header,
+        req = self._get(
+            self.endpoints["query_user"].format(user_id=quote(user_id)),
+            "Failed to query user."
         )
-        req = raise_if_no_suceed(req, "Failed to query user.")
         return req.json()
 
     def last_seen_user(self, user_id):
@@ -129,125 +148,111 @@ class MConnection:
         return last_seen
 
     def get_groups_of_room(self, room_id):
-        req_address = urljoin(
-            self.address,
-            path.join(
-                endpoints["groups_of_room"][0],
-                quote(room_id),
-                endpoints["groups_of_room"][1],
-            ),
-        )
-        req = requests.get(req_address, headers=self.auth_header)
-        if req.status_code == 404:
-            return []
-        req = raise_if_no_suceed(req, "Failed to get groups of room.")
-        return req.json()["groups"]
+        try:
+            req = self.session.get(
+                self.endpoints["groups_of_room"].format(room_id=quote(room_id))
+            )
+            return req.json()["groups"]
+        except requests.exceptions.HTTPError as e:
+            if req.status_code == 404:
+                return []
+            else:
+                raise MatrixCorporalPolicyLdapError(
+                f"Failed to get groups of room. Status: {e.request.status_code},Reason:{e.request.reason}"
+            )
 
     def get_rooms_of_group(self, group_id):
-        req_address = urljoin(
-            self.address,
-            path.join(
-                endpoints["rooms_of_group"][0],
-                quote(group_id),
-                endpoints["rooms_of_group"][1],
-            ),
+        req = self._get(
+            self.endpoints["rooms_of_group"].format(group_id=quote(group_id)),
+            "Failed to get rooms of group.",
         )
-        req = requests.get(req_address, headers=self.auth_header)
-        req = raise_if_no_suceed(req, "Failed to get rooms of group.")
         return [room["room_id"] for room in req.json()["chunk"]]
 
     def create_room(self, room_params):
-        req = requests.post(
-            urljoin(self.address, endpoints["create_room"]),
-            headers={**self.auth_header, "Content-Type": "application/json"},
+        req = self.session.post(
+            self.endpoints["create_room"],
+            "Failed to create room.",
+            headers={"Content-Type": "application/json"},
             json=room_params,
         )
-        req = raise_if_no_suceed(req, "Failed to create room.")
         return req.json()["room_id"]
 
     def create_group(self, group_params):
-        req = requests.post(
-            urljoin(self.address, endpoints["create_group"]),
-            headers={**self.auth_header, "Content-Type": "application/json"},
+        req = self.session.post(
+            self.endpoints["create_group"],
+            "Failed to create group.",
+            headers={"Content-Type": "application/json"},
             json=group_params,
         )
-        req = raise_if_no_suceed(req, "Failed to create group.")
         return req.json()["group_id"]
 
     def add_room_to_group(self, group_id, room_id, visibility):
-        endpoint = endpoints["rooms_to_group"]
-        data = {"m.visibility": {"type": visibility}}
-        req_address = urljoin(
-            self.address,
-            path.join(endpoint[0], quote(group_id), endpoint[1], quote(room_id)),
-        )
         req = requests.put(
-            req_address,
+            self.endpoints["rooms_to_group"].format(
+                group_id = quote(group_id),
+                room_id = quote(room_id),
+            ),
+            "Failed to add room to group.",
             headers={**self.auth_header, "Content-Type": "application/json",},
-            json=data,
+            json={"m.visibility": {"type": visibility}},
         )
-        req = raise_if_no_suceed(req, "Failed to add room to group.")
+
         old_groups = self.get_groups_of_room(room_id)
         if group_id not in old_groups:
-            endpoint = endpoints["groups_of_room"]
-            req_address = urljoin(
-                self.address, path.join(endpoint[0], quote(room_id), endpoint[1])
-            )
-            data = {"groups": old_groups + [group_id]}
             req = requests.put(
-                req_address,
+                self.endpoints["groups_of_room"].format(room_id=quote(room_id)),
+                "Failed to add group to room.",
                 headers={**self.auth_header, "Content-Type": "application/json",},
-                json=data,
+                json={"groups": old_groups + [group_id]},
             )
-            req = raise_if_no_suceed(req, "Failed to add group to room.")
-
-
-def defaults_room(room):
-    oroom = {
-        "topic": "",
-        "preset": "private_chat",
-        "creation_content": {"m.federate": False},
-    }
-    if type(room) == dict:
-        oroom.update(name=room["room_alias_name"])
-        oroom.update(**room)
-    else:
-        oroom.update(**{"room_alias_name": room, "name": room})
-    assert oroom["preset"] in preset_types, "Invalid room preset!"
-    return oroom
-
-
-def defaults_group(group):
-    if type(group) == dict:
-        data = {"profile": {}}
-        data.update(localpart=group.get("localpart", group["ldap_id"]))
-        data["profile"].update(name=group.get("name", group["ldap_id"]))
-        ogroup = {
-            "ldap_id": group["ldap_id"],
-            "rooms": group.get("rooms", []),
-            "room_visibility": group.get("room_visibility", "private"),
-            "localpart": data["localpart"],
-        }
-    else:
-        ogroup = {
-            "ldap_id": group,
-            "localpart": group,
-            "room_visibility": "private",
-            "rooms": [],
-        }
-        data = {"localpart": group, "profile": {"name": group}}
-    ogroup["data"] = data
-    return ogroup
 
 
 class PolicyConfig:
+    @staticmethod
+    def defaults_room(room):
+        oroom = {
+            "topic": "",
+            "preset": "private_chat",
+            "creation_content": {"m.federate": False},
+        }
+        if type(room) == dict:
+            oroom.update(name=room["room_alias_name"])
+            oroom.update(**room)
+        else:
+            oroom.update(**{"room_alias_name": room, "name": room})
+            assert oroom["preset"] in preset_types, "Invalid room preset!"
+            return oroom
+
+    @staticmethod
+    def defaults_group(group):
+        if type(group) == dict:
+            data = {"profile": {}}
+            data.update(localpart=group.get("localpart", group["ldap_id"]))
+            data["profile"].update(name=group.get("name", group["ldap_id"]))
+            ogroup = {
+                "ldap_id": group["ldap_id"],
+                "rooms": group.get("rooms", []),
+                "room_visibility": group.get("room_visibility", "private"),
+                "localpart": data["localpart"],
+            }
+        else:
+            ogroup = {
+                "ldap_id": group,
+                "localpart": group,
+                "room_visibility": "private",
+                "rooms": [],
+            }
+            data = {"localpart": group, "profile": {"name": group}}
+            ogroup["data"] = data
+            return ogroup
+
     def __init__(self, config):
         config = default_json(config_defaults, config)
         self.corporal = config["corporal"]
         self.ldap = config["ldap"]
         self.user_mode = config["user_mode"]
-        self.groups = [defaults_group(group) for group in config["communities"]]
-        self.rooms = [defaults_room(room) for room in config["rooms"]]
+        self.groups = [self.defaults_group(group) for group in config["communities"]]
+        self.rooms = [self.defaults_room(room) for room in config["rooms"]]
         self.user_defaults = config["user_defaults"]
         self.users = config["users"]
         self.lookup_path = config["lookup_path"]
