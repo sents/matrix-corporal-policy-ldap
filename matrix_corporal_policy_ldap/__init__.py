@@ -258,11 +258,17 @@ class PolicyConfig:
         self.user_defaults = config["user_defaults"]
         self.users = config["users"]
         self.lookup_path = config["lookup_path"]
-        if not path.exists(self.lookup_path):
-            with open(self.lookup_path, "w") as f:
-                json.dump({"rooms": {}, "groups": {}}, f)
-        with open(self.lookup_path) as f:
+
+        try:
+            f = open(self.lookup_path)
             self.lookup = json.load(f)
+        except FileNotFoundError:
+            f = open(self.lookup_path, "w")
+            self.lookup = {"rooms": {}, "groups": {}}
+            json.dump(self.lookup, f)
+        finally:
+            f.close()
+
         self.matrix_connection = MConnection(
             config["homeserver_api_endpoint"],
             config["homeserver_domain_name"],
