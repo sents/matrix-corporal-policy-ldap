@@ -44,14 +44,14 @@ class MConnection:
         "rooms_to_group": "/_matrix/client/r0/groups/{group_id}/admin/rooms/{room_id}",
         "rooms_of_group": "/_matrix/client/r0/groups/{group_id}/rooms",
     }
-    username_regex = "@([a-z0-9._=\\-\\/]+):"
+    username_regex = r"@(?P<username>[a-z0-9._=\-\/]+):"
 
     def __init__(self, address, servername, token):
         self.address = address
         self.servername = servername
         self.auth_header = {"Authorization": f"Bearer {token}"}
 
-        self.user_regex = self.username_regex + re.escape(servername)
+        self.user_regex = re.compile(self.username_regex + re.escape(servername))
 
         # set a default base for the url
         self.session = sessions.BaseUrlSession(base_url=address)
@@ -105,11 +105,11 @@ class MConnection:
             for userdic in req.json()["users"]
             if not userdic["deactivated"]
         ]
-        users = [
-            re.search(self.user_regex, user).groups()[0]
-            for user in users
-            if re.search(self.user_regex, user)
-        ]
+        users = []
+        for user in users
+            match = self.user_regex.search(user)
+            if match:
+                users.append(u.group('username'))
         return users
 
     def query_matrix_user(self, user_id):
