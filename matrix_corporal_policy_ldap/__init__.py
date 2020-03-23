@@ -228,15 +228,17 @@ class PolicyConfig:
 
     @staticmethod
     def defaults_group(group):
-        if type(group) == dict:
-            data = {"profile": {}}
-            data.update(localpart=group.get("localpart", group["ldap_id"]))
-            data["profile"].update(name=group.get("name", group["ldap_id"]))
+        if isinstance(group, dict):
+            localpart = group.get("localpart", group["ldap_id"])
             ogroup = {
                 "ldap_id": group["ldap_id"],
                 "rooms": group.get("rooms", []),
                 "room_visibility": group.get("room_visibility", "private"),
-                "localpart": data["localpart"],
+                "localpart": localpart,
+                "data": {
+                    "localpart": localpart,
+                    "profile": {"name": group.get("name", group["ldap_id"])},
+                }
             }
         else:
             ogroup = {
@@ -244,9 +246,8 @@ class PolicyConfig:
                 "localpart": group,
                 "room_visibility": "private",
                 "rooms": [],
+                "data": {"localpart": group, "profile": {"name": group}},
             }
-            data = {"localpart": group, "profile": {"name": group}}
-        ogroup["data"] = data
         return ogroup
 
     def __init__(self, config):
