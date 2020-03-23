@@ -15,9 +15,6 @@ from requests_toolbelt import sessions
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
-class MatrixCorporalPolicyLdapError(Exception):
-    pass
-
 
 def quote(string):
     return _quote(string, safe="@")
@@ -31,6 +28,10 @@ def merge_json(jdefault, jin):
         else:
             jout[key] = jin[key]
     return jout
+
+
+class MatrixCorporalPolicyLdapError(Exception):
+    pass
 
 
 class MConnection:
