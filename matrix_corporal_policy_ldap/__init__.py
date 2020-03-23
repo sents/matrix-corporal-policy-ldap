@@ -314,8 +314,6 @@ class PolicyConfig:
                         self.matrix_connection.add_room_to_group(
                             group_id, existing_rooms[room], group["room_visibility"]
                         )
-        except Exception as e:
-            raise e
         finally:
             self.lookup["rooms"].update(existing_rooms)
             self.lookup["groups"].update(existing_groups)
