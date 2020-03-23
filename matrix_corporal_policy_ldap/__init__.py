@@ -226,8 +226,8 @@ class PolicyConfig:
             oroom.update(**room)
         else:
             oroom.update(**{"room_alias_name": room, "name": room})
-            assert oroom["preset"] in preset_types, "Invalid room preset!"
-            return oroom
+        assert oroom["preset"] in preset_types, "Invalid room preset!"
+        return oroom
 
     @staticmethod
     def defaults_group(group):
@@ -249,8 +249,8 @@ class PolicyConfig:
                 "rooms": [],
             }
             data = {"localpart": group, "profile": {"name": group}}
-            ogroup["data"] = data
-            return ogroup
+        ogroup["data"] = data
+        return ogroup
 
     def __init__(self, config):
         config = default_json(config_defaults, config)
