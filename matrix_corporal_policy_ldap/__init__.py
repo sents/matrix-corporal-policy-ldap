@@ -45,11 +45,8 @@ def quote(string):
 def default_json(jdef, jin):
     jout = deepcopy(jdef)
     for key in jin:
-        if key in jout:
-            if type(jin[key]) == dict:
-                jout[key] = default_json(jdef[key], jin[key])
-            else:
-                jout[key] = jin[key]
+        if key in jout and instance(jin[key], dict):
+            jout[key] = merge_json(jdef[key], jin[key])
         else:
             jout[key] = jin[key]
     return jout
