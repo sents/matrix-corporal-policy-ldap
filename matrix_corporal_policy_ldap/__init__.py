@@ -293,7 +293,7 @@ class PolicyConfig:
                     f"Failed to connect to LDAP server: {e.args}"
                 )
 
-    def create_things(self):
+    def create_missing_rooms_and_groups(self):
         existing_rooms = self.lookup["rooms"]
         existing_groups = self.lookup["groups"]
         try:
@@ -427,7 +427,7 @@ def main():
     with open(args.configfile, "r") as f:
         config = json.load(f)
     policy_config = PolicyConfig(config)
-    policy_config.create_things()
+    policy_config.create_missing_rooms_and_groups()
     while True:
         policy = policy_config.generate_policy()
         if args.output is None:
