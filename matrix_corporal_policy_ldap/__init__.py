@@ -15,24 +15,6 @@ from requests_toolbelt import sessions
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
-config_defaults = {
-    "corporal": {
-        "schemaVersion": 1,
-        "flags": {"allowCustomUserDisplayNames": True, "allowCustomUserAvatars": True},
-    },
-    "deactivate_after": 180,
-    "user_defaults": {"authType": "rest", "authCredential": "http://localhost:8090"},
-    "user_mode": "existing",
-    "ldap": {
-        "scope": "LEVEL",
-        "user_filter": None,
-        "user_avatar_uri": None,
-        "group_prefix": "",
-    },
-    "users": [],
-}
-
-
 class MatrixCorporalPolicyLdapError(Exception):
     pass
 
@@ -41,11 +23,11 @@ def quote(string):
     return _quote(string, safe="@")
 
 
-def default_json(jdef, jin):
-    jout = deepcopy(jdef)
+def merge_json(jdefault, jin):
+    jout = deepcopy(jdefault)
     for key in jin:
         if key in jout and instance(jin[key], dict):
-            jout[key] = merge_json(jdef[key], jin[key])
+            jout[key] = merge_json(jdefault[key], jin[key])
         else:
             jout[key] = jin[key]
     return jout
@@ -209,6 +191,27 @@ class MConnection:
 
 class PolicyConfig:
     @staticmethod
+    def defaults_config(config):
+        oconfig = {
+            "corporal": {
+                "schemaVersion": 1,
+                "flags": {"allowCustomUserDisplayNames": True, "allowCustomUserAvatars": True},
+            },
+            "deactivate_after": 180,
+            "user_defaults": {"authType": "rest", "authCredential": "http://localhost:8090"},
+            "user_mode": "existing",
+            "ldap": {
+                "scope": "LEVEL",
+                "user_filter": None,
+                "user_avatar_uri": None,
+                "group_prefix": "",
+            },
+            "users": [],
+        }
+        merge_json(oconfig, config)
+        return oconfig
+
+    @staticmethod
     def defaults_room(room):
         preset_types = ("private_chat", "trusted_private_chat", "public_chat")
 
@@ -251,7 +254,7 @@ class PolicyConfig:
         return ogroup
 
     def __init__(self, config):
-        config = default_json(config_defaults, config)
+        config = self.defaults_json(config)
         self.corporal = config["corporal"]
         self.ldap = config["ldap"]
         self.user_mode = config["user_mode"]
