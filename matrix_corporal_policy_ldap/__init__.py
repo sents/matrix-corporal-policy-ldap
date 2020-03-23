@@ -289,8 +289,8 @@ class PolicyConfig:
             try:
                 self.ldap_connection.rebind()
             except Exception as e:
-                raise RuntimeError(
-                    "Failed to connect to LDAP server: {}".format(e.args)
+                raise MatrixCorporalPolicyLdapError(
+                    f"Failed to connect to LDAP server: {e.args}"
                 )
 
     def create_things(self):
