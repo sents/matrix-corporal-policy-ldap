@@ -92,17 +92,25 @@ class MConnection:
             lambda response, *args, **kwargs: response.raise_for_status()
         ]
 
-    def _get(endpoint, message, *args, **kwargs):
+    def _get(self, endpoint, message, *args, **kwargs):
         try:
-            self.session.get(endpoint, *args, **kwargs)
+            return self.session.get(endpoint, *args, **kwargs)
         except requests.exceptions.HTTPError as e:
             raise MatrixCorporalPolicyLdapError(
                 message + f" Status: {e.request.status_code},Reason:{e.request.reason}"
             )
 
-    def _post(endpoint, message, *args, **kwargs):
+    def _post(self, endpoint, message, *args, **kwargs):
         try:
-            self.session.post(endpoint, *args, **kwargs)
+            return self.session.post(endpoint, *args, **kwargs)
+        except requests.exceptions.HTTPError as e:
+            raise MatrixCorporalPolicyLdapError(
+                message + f" Status: {e.request.status_code},Reason:{e.request.reason}"
+            )
+
+    def _put(self, endpoint, message, *args, **kwargs):
+        try:
+            return self.session.put(endpoint, *args, **kwargs)
         except requests.exceptions.HTTPError as e:
             raise MatrixCorporalPolicyLdapError(
                 message + f" Status: {e.request.status_code},Reason:{e.request.reason}"
@@ -131,7 +139,7 @@ class MConnection:
     def query_matrix_user(self, user_id):
         req = self._get(
             self.endpoints["query_user"].format(user_id=quote(user_id)),
-            "Failed to query user."
+            "Failed to query user.",
         )
         return req.json()
 
@@ -158,8 +166,8 @@ class MConnection:
                 return []
             else:
                 raise MatrixCorporalPolicyLdapError(
-                f"Failed to get groups of room. Status: {e.request.status_code},Reason:{e.request.reason}"
-            )
+                    f"Failed to get groups of room. Status: {e.request.status_code},Reason:{e.request.reason}"
+                )
 
     def get_rooms_of_group(self, group_id):
         req = self._get(
@@ -187,10 +195,9 @@ class MConnection:
         return req.json()["group_id"]
 
     def add_room_to_group(self, group_id, room_id, visibility):
-        req = requests.put(
+        req = self._put(
             self.endpoints["rooms_to_group"].format(
-                group_id = quote(group_id),
-                room_id = quote(room_id),
+                group_id=quote(group_id), room_id=quote(room_id),
             ),
             "Failed to add room to group.",
             headers={**self.auth_header, "Content-Type": "application/json",},
@@ -199,7 +206,7 @@ class MConnection:
 
         old_groups = self.get_groups_of_room(room_id)
         if group_id not in old_groups:
-            req = requests.put(
+            req = self._put(
                 self.endpoints["groups_of_room"].format(room_id=quote(room_id)),
                 "Failed to add group to room.",
                 headers={**self.auth_header, "Content-Type": "application/json",},
