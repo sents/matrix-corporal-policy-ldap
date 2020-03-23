@@ -217,11 +217,12 @@ class PolicyConfig:
             "preset": "private_chat",
             "creation_content": {"m.federate": False},
         }
-        if type(room) == dict:
+        if isinstance(room, dict):
             oroom.update(name=room["room_alias_name"])
-            oroom.update(**room)
+            oroom.update(room)
         else:
-            oroom.update(**{"room_alias_name": room, "name": room})
+            oroom.update({"room_alias_name": room, "name": room})
+
         assert oroom["preset"] in preset_types, "Invalid room preset!"
         return oroom
 
