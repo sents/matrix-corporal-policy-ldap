@@ -1,11 +1,10 @@
 import re
 import time
 import json
+import sys
 
 import requests
 
-from os import path
-from sys import stdout
 from copy import deepcopy
 from argparse import ArgumentParser
 from urllib.parse import urljoin
@@ -422,7 +421,7 @@ def main():
     while True:
         policy = policy_config.generate_policy()
         if args.output is None:
-            json.dump(policy, stdout)
+            json.dump(policy, sys.stdout)
         else:
             with open(args.output, "r") as f:
                 oldpolicy = json.load(f)
