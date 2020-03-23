@@ -34,9 +34,6 @@ config_defaults = {
 }
 
 
-preset_types = ["private_chat", "trusted_private_chat", "public_chat"]
-
-
 class MatrixCorporalPolicyLdapError(Exception):
     pass
 
@@ -217,6 +214,8 @@ class MConnection:
 class PolicyConfig:
     @staticmethod
     def defaults_room(room):
+        preset_types = ("private_chat", "trusted_private_chat", "public_chat")
+
         oroom = {
             "topic": "",
             "preset": "private_chat",
