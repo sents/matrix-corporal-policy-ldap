@@ -1,11 +1,10 @@
 import re
 import time
 import json
+import sys
 
 import requests
 
-from os import path
-from sys import stdout
 from copy import deepcopy
 from argparse import ArgumentParser
 from urllib.parse import urljoin
@@ -16,43 +15,23 @@ from requests_toolbelt import sessions
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
-config_defaults = {
-    "corporal": {
-        "schemaVersion": 1,
-        "flags": {"allowCustomUserDisplayNames": True, "allowCustomUserAvatars": True},
-    },
-    "deactivate_after": 180,
-    "user_defaults": {"authType": "rest", "authCredential": "http://localhost:8090"},
-    "user_mode": "existing",
-    "ldap": {
-        "scope": "LEVEL",
-        "user_filter": None,
-        "user_avatar_uri": None,
-        "group_prefix": "",
-    },
-    "users": [],
-}
-
-
-class MatrixCorporalPolicyLdapError(Exception):
-    pass
-
 
 def quote(string):
     return _quote(string, safe="@")
 
 
-def default_json(jdef, jin):
-    jout = deepcopy(jdef)
+def merge_json(jdefault, jin):
+    jout = deepcopy(jdefault)
     for key in jin:
-        if key in jout:
-            if type(jin[key]) == dict:
-                jout[key] = default_json(jdef[key], jin[key])
-            else:
-                jout[key] = jin[key]
+        if key in jout and instance(jin[key], dict):
+            jout[key] = merge_json(jdefault[key], jin[key])
         else:
             jout[key] = jin[key]
     return jout
+
+
+class MatrixCorporalPolicyLdapError(Exception):
+    pass
 
 
 class MConnection:
@@ -65,56 +44,63 @@ class MConnection:
         "rooms_to_group": "/_matrix/client/r0/groups/{group_id}/admin/rooms/{room_id}",
         "rooms_of_group": "/_matrix/client/r0/groups/{group_id}/rooms",
     }
-    username_regex = "@([a-z0-9._=\\-\\/]+):"
+    username_regex = r"@(?P<username>[a-z0-9._=\-\/]+):"
 
-    def __init__(self, address, servername, token):
+    def __init__(self, address, servername, token, *, maxretries=5):
         self.address = address
         self.servername = servername
         self.auth_header = {"Authorization": f"Bearer {token}"}
+        self._maxtreies = maxretries
 
-        self.user_regex = self.username_regex + re.escape(servername)
+        self.user_regex = re.compile(self.username_regex + re.escape(servername))
 
         # set a default base for the url
         self.session = sessions.BaseUrlSession(base_url=address)
         # set auth_header as default
         self.session.headers.update(self.auth_header)
-        # retry all 429 error codes
-        adapter = HTTPAdapter(
-            max_retries=Retry(total=3, status_forcelist=[429], raise_on_status=False)
-        )
-        self.session.mount("https://", adapter)
-        self.session.mount("http://", adapter)
         # check non 4XX or 5XX status code on each response
         self.session.hooks["response"] = [
             lambda response, *args, **kwargs: response.raise_for_status()
         ]
 
     def _get(self, endpoint, message, *args, **kwargs):
-        try:
-            return self.session.get(endpoint, *args, **kwargs)
-        except requests.exceptions.HTTPError as e:
-            raise MatrixCorporalPolicyLdapError(
-                message
-                + f" Status: {e.response.status_code},Reason:{e.response.reason}"
-            )
+        for i in range(self._maxretries):
+            try:
+                req = self.session.get(endpoint, *args, **kwargs)
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 429:
+                    time.sleep(req.json()["retry_after_ms"] / 1000)
+                else:
+                    raise MatrixCorporalPolicyLdapError(
+                        message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
+                    )
+        return req
 
     def _post(self, endpoint, message, *args, **kwargs):
-        try:
-            return self.session.post(endpoint, *args, **kwargs)
-        except requests.exceptions.HTTPError as e:
-            raise MatrixCorporalPolicyLdapError(
-                message
-                + f" Status: {e.response.status_code},Reason:{e.response.reason}"
-            )
+        for i in range(self._maxretries):
+            try:
+                req = self.session.post(endpoint, *args, **kwargs)
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 429:
+                    time.sleep(req.json()["retry_after_ms"] / 1000)
+                else:
+                    raise MatrixCorporalPolicyLdapError(
+                        message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
+                    )
+        return req
 
     def _put(self, endpoint, message, *args, **kwargs):
-        try:
-            return self.session.put(endpoint, *args, **kwargs)
-        except requests.exceptions.HTTPError as e:
-            raise MatrixCorporalPolicyLdapError(
-                message
-                + f" Status: {e.response.status_code},Reason:{e.response.reason}"
-            )
+        for i in range(self._maxretries):
+            try:
+                req = self.session.put(endpoint, *args, **kwargs)
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 429:
+                    time.sleep(req.json()["retry_after_ms"] / 1000)
+                else:
+                    raise MatrixCorporalPolicyLdapError(
+                        message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
+                    )
+        return req
 
     def user_id(self, username):
         return f"@{username}:{self.servername}"
@@ -129,11 +115,11 @@ class MConnection:
             for userdic in req.json()["users"]
             if not userdic["deactivated"]
         ]
-        users = [
-            re.search(self.user_regex, user).groups()[0]
-            for user in users
-            if re.search(self.user_regex, user)
-        ]
+        users = []
+        for user in users
+            match = self.user_regex.search(user)
+            if match:
+                users.append(u.group('username'))
         return users
 
     def query_matrix_user(self, user_id):
@@ -216,6 +202,27 @@ class MConnection:
 
 class PolicyConfig:
     @staticmethod
+    def defaults_config(config):
+        oconfig = {
+            "corporal": {
+                "schemaVersion": 1,
+                "flags": {"allowCustomUserDisplayNames": True, "allowCustomUserAvatars": True},
+            },
+            "deactivate_after": 180,
+            "user_defaults": {"authType": "rest", "authCredential": "http://localhost:8090"},
+            "user_mode": "existing",
+            "ldap": {
+                "scope": "LEVEL",
+                "user_filter": None,
+                "user_avatar_uri": None,
+                "group_prefix": "",
+            },
+            "users": [],
+        }
+        merge_json(oconfig, config)
+        return oconfig
+
+    @staticmethod
     def defaults_room(room):
         preset_types = ("private_chat", "trusted_private_chat", "public_chat")
 
@@ -224,25 +231,28 @@ class PolicyConfig:
             "preset": "private_chat",
             "creation_content": {"m.federate": False},
         }
-        if type(room) == dict:
+        if isinstance(room, dict):
             oroom.update(name=room["room_alias_name"])
-            oroom.update(**room)
+            oroom.update(room)
         else:
-            oroom.update(**{"room_alias_name": room, "name": room})
+            oroom.update({"room_alias_name": room, "name": room})
+
         assert oroom["preset"] in preset_types, "Invalid room preset!"
         return oroom
 
     @staticmethod
     def defaults_group(group):
-        if type(group) == dict:
-            data = {"profile": {}}
-            data.update(localpart=group.get("localpart", group["ldap_id"]))
-            data["profile"].update(name=group.get("name", group["ldap_id"]))
+        if isinstance(group, dict):
+            localpart = group.get("localpart", group["ldap_id"])
             ogroup = {
                 "ldap_id": group["ldap_id"],
                 "rooms": group.get("rooms", []),
                 "room_visibility": group.get("room_visibility", "private"),
-                "localpart": data["localpart"],
+                "localpart": localpart,
+                "data": {
+                    "localpart": localpart,
+                    "profile": {"name": group.get("name", group["ldap_id"])},
+                }
             }
         else:
             ogroup = {
@@ -250,13 +260,12 @@ class PolicyConfig:
                 "localpart": group,
                 "room_visibility": "private",
                 "rooms": [],
+                "data": {"localpart": group, "profile": {"name": group}},
             }
-            data = {"localpart": group, "profile": {"name": group}}
-        ogroup["data"] = data
         return ogroup
 
     def __init__(self, config):
-        config = default_json(config_defaults, config)
+        config = self.defaults_config(config)
         self.corporal = config["corporal"]
         self.ldap = config["ldap"]
         self.user_mode = config["user_mode"]
@@ -265,11 +274,17 @@ class PolicyConfig:
         self.user_defaults = config["user_defaults"]
         self.users = config["users"]
         self.lookup_path = config["lookup_path"]
-        if not path.exists(self.lookup_path):
-            with open(self.lookup_path, "w") as f:
-                json.dump({"rooms": {}, "groups": {}}, f)
-        with open(self.lookup_path) as f:
+
+        try:
+            f = open(self.lookup_path)
             self.lookup = json.load(f)
+        except FileNotFoundError:
+            f = open(self.lookup_path, "w")
+            self.lookup = {"rooms": {}, "groups": {}}
+            json.dump(self.lookup, f)
+        finally:
+            f.close()
+
         self.matrix_connection = MConnection(
             config["homeserver_api_endpoint"],
             config["homeserver_domain_name"],
@@ -284,11 +299,11 @@ class PolicyConfig:
             try:
                 self.ldap_connection.rebind()
             except Exception as e:
-                raise RuntimeError(
-                    "Failed to connect to LDAP server: {}".format(e.args)
+                raise MatrixCorporalPolicyLdapError(
+                    f"Failed to connect to LDAP server: {e.args}"
                 )
 
-    def create_things(self):
+    def create_missing_rooms_and_groups(self):
         existing_rooms = self.lookup["rooms"]
         existing_groups = self.lookup["groups"]
         try:
@@ -309,8 +324,6 @@ class PolicyConfig:
                         self.matrix_connection.add_room_to_group(
                             group_id, existing_rooms[room], group["room_visibility"]
                         )
-        except Exception as e:
-            raise e
         finally:
             self.lookup["rooms"].update(existing_rooms)
             self.lookup["groups"].update(existing_groups)
@@ -424,11 +437,11 @@ def main():
     with open(args.configfile, "r") as f:
         config = json.load(f)
     policy_config = PolicyConfig(config)
-    policy_config.create_things()
+    policy_config.create_missing_rooms_and_groups()
     while True:
         policy = policy_config.generate_policy()
         if args.output is None:
-            json.dump(policy, stdout)
+            json.dump(policy, sys.stdout)
         else:
             with open(args.output, "r") as f:
                 oldpolicy = json.load(f)
