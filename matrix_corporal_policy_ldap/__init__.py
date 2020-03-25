@@ -104,7 +104,7 @@ class MConnection:
             try:
                 req = self.session.put(endpoint, *args, **kwargs)
                 break
-            except MatrixRequestError as e:
+            except requests.exceptions.HTTPError as e:
                 if e.http_error.response.status_code == 429:
                     time.sleep(e.response.json()["retry_after_ms"] / 1000)
                 else:
@@ -161,7 +161,7 @@ class MConnection:
             )
             return req.json()["groups"]
         except MatrixRequestError as e:
-            if e.response.status_code == 404:
+            if e.http_error.response.status_code == 404:
                 return []
             else:
                 raise MatrixRequestError(
