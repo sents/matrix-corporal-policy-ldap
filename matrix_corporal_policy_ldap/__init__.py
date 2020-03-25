@@ -59,7 +59,12 @@ class MConnection:
         self.session.headers.update(self.auth_header)
         # retry all 429 error codes
         adapter = HTTPAdapter(
-            max_retries=Retry(total=3, status_forcelist=[429], raise_on_status=False)
+            max_retries=Retry(
+                total=3,
+                status_forcelist=[429],
+                raise_on_status=False,
+                backoff_factor=0.5,
+            )
         )
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
