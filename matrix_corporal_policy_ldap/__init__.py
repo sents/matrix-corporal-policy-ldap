@@ -70,7 +70,7 @@ class MConnection:
                 break
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code == 429:
-                    time.sleep(req.json()["retry_after_ms"] / 1000)
+                    time.sleep(e.response.json()["retry_after_ms"] / 1000)
                 else:
                     raise MatrixCorporalPolicyLdapError(
                         message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
@@ -84,7 +84,7 @@ class MConnection:
                 break
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code == 429:
-                    time.sleep(req.json()["retry_after_ms"] / 1000)
+                    time.sleep(e.response.json()["retry_after_ms"] / 1000)
                 else:
                     raise MatrixCorporalPolicyLdapError(
                         message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
@@ -98,7 +98,7 @@ class MConnection:
                 break
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code == 429:
-                    time.sleep(req.json()["retry_after_ms"] / 1000)
+                    time.sleep(e.response.json()["retry_after_ms"] / 1000)
                 else:
                     raise MatrixCorporalPolicyLdapError(
                         message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
