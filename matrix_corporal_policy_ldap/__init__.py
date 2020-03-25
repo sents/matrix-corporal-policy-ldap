@@ -147,7 +147,8 @@ class MConnection:
     def get_groups_of_room(self, room_id):
         try:
             req = self._get(
-                self.endpoints["groups_of_room"].format(room_id=quote(room_id))
+                self.endpoints["groups_of_room"].format(room_id=quote(room_id)),
+                "Failed to get groups of room."
             )
             return req.json()["groups"]
         except requests.exceptions.HTTPError as e:
