@@ -35,10 +35,9 @@ class MatrixCorporalPolicyLdapError(Exception):
 
 
 class MatrixRequestError(Exception):
-    def __init__(self, request, response, message):
+    def __init__(self, http_error, message):
         super(MatrixRequestError, self).__init__(message)
-        self.request = request
-        self.response = response
+        self.http_error = http_error
 
 
 class MConnection:
@@ -80,8 +79,7 @@ class MConnection:
                     time.sleep(e.response.json()["retry_after_ms"] / 1000)
                 else:
                     raise MatrixRequestError(
-                        e.request,
-                        e.response,
+                        e,
                         message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
                     )
         return req
@@ -96,8 +94,7 @@ class MConnection:
                     time.sleep(e.response.json()["retry_after_ms"] / 1000)
                 else:
                     raise MatrixRequestError(
-                        e.request,
-                        e.response,
+                        e,
                         message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
                     )
         return req
@@ -107,13 +104,12 @@ class MConnection:
             try:
                 req = self.session.put(endpoint, *args, **kwargs)
                 break
-            except requests.exceptions.HTTPError as e:
-                if e.response.status_code == 429:
+            except MatrixRequestError as e:
+                if e.http_error.response.status_code == 429:
                     time.sleep(e.response.json()["retry_after_ms"] / 1000)
                 else:
                     raise MatrixRequestError(
-                        e.request,
-                        e.response,
+                        e,
                         message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
                     )
         return req
@@ -169,8 +165,7 @@ class MConnection:
                 return []
             else:
                 raise MatrixRequestError(
-                    e.request,
-                    e.response,
+                    e,
                     f"Failed to get groups of room. Status: {e.request.status_code}, Reason:{e.request.reason}"
                 )
 
