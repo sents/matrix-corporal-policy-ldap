@@ -46,10 +46,11 @@ class MConnection:
     }
     username_regex = r"@(?P<username>[a-z0-9._=\-\/]+):"
 
-    def __init__(self, address, servername, token):
+    def __init__(self, address, servername, token, *, maxretries=5):
         self.address = address
         self.servername = servername
         self.auth_header = {"Authorization": f"Bearer {token}"}
+        self._maxtreies = maxretries
 
         self.user_regex = re.compile(self.username_regex + re.escape(servername))
 
@@ -57,45 +58,49 @@ class MConnection:
         self.session = sessions.BaseUrlSession(base_url=address)
         # set auth_header as default
         self.session.headers.update(self.auth_header)
-        # retry all 429 error codes
-        adapter = HTTPAdapter(
-            max_retries=Retry(
-                total=3,
-                status_forcelist=[429],
-                raise_on_status=False,
-                backoff_factor=0.5,
-            )
-        )
-        self.session.mount("https://", adapter)
-        self.session.mount("http://", adapter)
         # check non 4XX or 5XX status code on each response
         self.session.hooks["response"] = [
             lambda response, *args, **kwargs: response.raise_for_status()
         ]
 
     def _get(self, endpoint, message, *args, **kwargs):
-        try:
-            return self.session.get(endpoint, *args, **kwargs)
-        except requests.exceptions.HTTPError as e:
-            raise MatrixCorporalPolicyLdapError(
-                message + f" Status: {e.request.status_code},Reason:{e.request.reason}"
-            )
+        for i in range(self._maxretries):
+            try:
+                req = self.session.get(endpoint, *args, **kwargs)
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 429:
+                    time.sleep(req.json()["retry_after_ms"] / 1000)
+                else:
+                    raise MatrixCorporalPolicyLdapError(
+                        message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
+                    )
+        return req
 
     def _post(self, endpoint, message, *args, **kwargs):
-        try:
-            return self.session.post(endpoint, *args, **kwargs)
-        except requests.exceptions.HTTPError as e:
-            raise MatrixCorporalPolicyLdapError(
-                message + f" Status: {e.request.status_code},Reason:{e.request.reason}"
-            )
+        for i in range(self._maxretries):
+            try:
+                req = self.session.post(endpoint, *args, **kwargs)
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 429:
+                    time.sleep(req.json()["retry_after_ms"] / 1000)
+                else:
+                    raise MatrixCorporalPolicyLdapError(
+                        message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
+                    )
+        return req
 
     def _put(self, endpoint, message, *args, **kwargs):
-        try:
-            return self.session.put(endpoint, *args, **kwargs)
-        except requests.exceptions.HTTPError as e:
-            raise MatrixCorporalPolicyLdapError(
-                message + f" Status: {e.request.status_code},Reason:{e.request.reason}"
-            )
+        for i in range(self._maxretries):
+            try:
+                req = self.session.put(endpoint, *args, **kwargs)
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 429:
+                    time.sleep(req.json()["retry_after_ms"] / 1000)
+                else:
+                    raise MatrixCorporalPolicyLdapError(
+                        message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
+                    )
+        return req
 
     def user_id(self, username):
         return f"@{username}:{self.servername}"
