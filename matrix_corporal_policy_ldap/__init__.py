@@ -67,6 +67,7 @@ class MConnection:
         for i in range(self._maxretries):
             try:
                 req = self.session.get(endpoint, *args, **kwargs)
+                break
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code == 429:
                     time.sleep(req.json()["retry_after_ms"] / 1000)
@@ -80,6 +81,7 @@ class MConnection:
         for i in range(self._maxretries):
             try:
                 req = self.session.post(endpoint, *args, **kwargs)
+                break
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code == 429:
                     time.sleep(req.json()["retry_after_ms"] / 1000)
@@ -93,6 +95,7 @@ class MConnection:
         for i in range(self._maxretries):
             try:
                 req = self.session.put(endpoint, *args, **kwargs)
+                break
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code == 429:
                     time.sleep(req.json()["retry_after_ms"] / 1000)
