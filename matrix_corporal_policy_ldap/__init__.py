@@ -219,8 +219,7 @@ class PolicyConfig:
             },
             "users": [],
         }
-        merge_json(oconfig, config)
-        return oconfig
+        return merge_json(oconfig, config)
 
     @staticmethod
     def defaults_room(room):
