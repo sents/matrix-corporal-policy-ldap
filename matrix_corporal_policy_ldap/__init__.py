@@ -50,7 +50,7 @@ class MConnection:
         self.address = address
         self.servername = servername
         self.auth_header = {"Authorization": f"Bearer {token}"}
-        self._maxtreies = maxretries
+        self._maxretries = maxretries
 
         self.user_regex = re.compile(self.username_regex + re.escape(servername))
 
