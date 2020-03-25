@@ -255,7 +255,7 @@ class PolicyConfig:
         return ogroup
 
     def __init__(self, config):
-        config = self.defaults_json(config)
+        config = self.defaults_config(config)
         self.corporal = config["corporal"]
         self.ldap = config["ldap"]
         self.user_mode = config["user_mode"]
