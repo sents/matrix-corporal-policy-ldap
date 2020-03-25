@@ -143,7 +143,7 @@ class MConnection:
 
     def get_groups_of_room(self, room_id):
         try:
-            req = self.session.get(
+            req = self._get(
                 self.endpoints["groups_of_room"].format(room_id=quote(room_id))
             )
             return req.json()["groups"]
@@ -163,7 +163,7 @@ class MConnection:
         return [room["room_id"] for room in req.json()["chunk"]]
 
     def create_room(self, room_params):
-        req = self.session.post(
+        req = self._post(
             self.endpoints["create_room"],
             "Failed to create room.",
             headers={"Content-Type": "application/json"},
@@ -172,7 +172,7 @@ class MConnection:
         return req.json()["room_id"]
 
     def create_group(self, group_params):
-        req = self.session.post(
+        req = self._post(
             self.endpoints["create_group"],
             "Failed to create group.",
             headers={"Content-Type": "application/json"},
