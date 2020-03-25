@@ -94,7 +94,8 @@ class MConnection:
             return self.session.get(endpoint, *args, **kwargs)
         except requests.exceptions.HTTPError as e:
             raise MatrixCorporalPolicyLdapError(
-                message + f" Status: {e.request.status_code},Reason:{e.request.reason}"
+                message
+                + f" Status: {e.response.status_code},Reason:{e.response.reason}"
             )
 
     def _post(self, endpoint, message, *args, **kwargs):
@@ -102,7 +103,8 @@ class MConnection:
             return self.session.post(endpoint, *args, **kwargs)
         except requests.exceptions.HTTPError as e:
             raise MatrixCorporalPolicyLdapError(
-                message + f" Status: {e.request.status_code},Reason:{e.request.reason}"
+                message
+                + f" Status: {e.response.status_code},Reason:{e.response.reason}"
             )
 
     def _put(self, endpoint, message, *args, **kwargs):
@@ -110,7 +112,8 @@ class MConnection:
             return self.session.put(endpoint, *args, **kwargs)
         except requests.exceptions.HTTPError as e:
             raise MatrixCorporalPolicyLdapError(
-                message + f" Status: {e.request.status_code},Reason:{e.request.reason}"
+                message
+                + f" Status: {e.response.status_code},Reason:{e.response.reason}"
             )
 
     def user_id(self, username):
