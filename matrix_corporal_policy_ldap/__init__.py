@@ -34,6 +34,13 @@ class MatrixCorporalPolicyLdapError(Exception):
     pass
 
 
+class MatrixRequestError(Exception):
+    def __init__(self, request, response, message):
+        super(MatrixRequestError, self).__init__(message)
+        self.request = request
+        self.response = response
+
+
 class MConnection:
     endpoints = {
         "list_users": "/_synapse/admin/v2/users?from=0",
@@ -72,7 +79,9 @@ class MConnection:
                 if e.response.status_code == 429:
                     time.sleep(e.response.json()["retry_after_ms"] / 1000)
                 else:
-                    raise MatrixCorporalPolicyLdapError(
+                    raise MatrixRequestError(
+                        e.request,
+                        e.response,
                         message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
                     )
         return req
@@ -86,7 +95,9 @@ class MConnection:
                 if e.response.status_code == 429:
                     time.sleep(e.response.json()["retry_after_ms"] / 1000)
                 else:
-                    raise MatrixCorporalPolicyLdapError(
+                    raise MatrixRequestError(
+                        e.request,
+                        e.response,
                         message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
                     )
         return req
@@ -100,7 +111,9 @@ class MConnection:
                 if e.response.status_code == 429:
                     time.sleep(e.response.json()["retry_after_ms"] / 1000)
                 else:
-                    raise MatrixCorporalPolicyLdapError(
+                    raise MatrixRequestError(
+                        e.request,
+                        e.response,
                         message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
                     )
         return req
@@ -151,12 +164,14 @@ class MConnection:
                 "Failed to get groups of room."
             )
             return req.json()["groups"]
-        except requests.exceptions.HTTPError as e:
-            if req.status_code == 404:
+        except MatrixRequestError as e:
+            if e.response.status_code == 404:
                 return []
             else:
-                raise MatrixCorporalPolicyLdapError(
-                    f"Failed to get groups of room. Status: {e.request.status_code},Reason:{e.request.reason}"
+                raise MatrixRequestError(
+                    e.request,
+                    e.response,
+                    f"Failed to get groups of room. Status: {e.request.status_code}, Reason:{e.request.reason}"
                 )
 
     def get_rooms_of_group(self, group_id):
