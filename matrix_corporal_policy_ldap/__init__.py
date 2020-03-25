@@ -23,7 +23,7 @@ def quote(string):
 def merge_json(jdefault, jin):
     jout = deepcopy(jdefault)
     for key in jin:
-        if key in jout and instance(jin[key], dict):
+        if key in jout and isinstance(jin[key], dict):
             jout[key] = merge_json(jdefault[key], jin[key])
         else:
             jout[key] = jin[key]
@@ -116,10 +116,10 @@ class MConnection:
             if not userdic["deactivated"]
         ]
         users = []
-        for user in users
+        for user in users:
             match = self.user_regex.search(user)
             if match:
-                users.append(u.group('username'))
+                users.append(match.group('username'))
         return users
 
     def query_matrix_user(self, user_id):
