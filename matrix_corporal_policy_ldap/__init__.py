@@ -42,7 +42,7 @@ class MatrixRequestError(Exception):
 
 class MConnection:
     endpoints = {
-        "list_users": "/_synapse/admin/v2/users?from=0",
+        "list_users": "/_synapse/admin/v2/users?from=0&guests=false",
         "query_user": "/_synapse/admin/v2/users/{user_id}",
         "create_room": "/_matrix/client/r0/createRoom",
         "create_group": "/_matrix/client/r0/create_group",
