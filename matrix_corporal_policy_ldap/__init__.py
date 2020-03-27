@@ -366,8 +366,8 @@ class PolicyConfig:
     def user_policy(self, user_result):
         policy = {**self.user_defaults}
         username = user_result[self.ldap["user_id"]].value
-        display_name = user_result[
-            self.ldap.get("user_displayname", self.ldap["user_id"])
+        displayname = user_result[
+            self.ldap.get("user_displayname", self.ldap["user_displayname"])
         ].value
         if self.ldap["user_avatar_uri"] is None:
             avatar_uri = ""
@@ -398,7 +398,7 @@ class PolicyConfig:
             {
                 "id": user_id,
                 "active": True,
-                "displayName": display_name,
+                "displayName": displayname,
                 "avatarUri": avatar_uri,
                 "joinedCommunityIds": groups,
                 "joinedRoomIds": rooms,
