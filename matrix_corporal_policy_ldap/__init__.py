@@ -5,15 +5,13 @@ import sys
 
 import requests
 
+from os.path import exists
 from copy import deepcopy
 from argparse import ArgumentParser
-from urllib.parse import urljoin
 from urllib.parse import quote as _quote
 
 from ldap3 import Connection
 from requests_toolbelt import sessions
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
 
 
 def quote(string):
@@ -456,9 +454,13 @@ def main():
         if args.output is None:
             json.dump(policy, sys.stdout)
         else:
-            with open(args.output, "r") as f:
-                oldpolicy = json.load(f)
-            if policy != oldpolicy:
+            if exists(args.output):
+                with open(args.output, "r") as f:
+                    oldpolicy = json.load(f)
+                    update = True if policy != oldpolicy else False
+            else:
+                update = True
+            if update:
                 with open(args.output, "w") as f:
                     json.dump(policy, f)
         if args.repeat is None:
