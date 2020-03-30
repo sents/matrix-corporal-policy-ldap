@@ -78,7 +78,8 @@ class MConnection:
                 else:
                     raise MatrixRequestError(
                         e,
-                        message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
+                        message
+                        + f" Status: {e.response.status_code},Reason:{e.response.reason}",
                     )
         return req
 
@@ -93,7 +94,8 @@ class MConnection:
                 else:
                     raise MatrixRequestError(
                         e,
-                        message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
+                        message
+                        + f" Status: {e.response.status_code},Reason:{e.response.reason}",
                     )
         return req
 
@@ -108,7 +110,8 @@ class MConnection:
                 else:
                     raise MatrixRequestError(
                         e,
-                        message + f" Status: {e.response.status_code},Reason:{e.response.reason}"
+                        message
+                        + f" Status: {e.response.status_code},Reason:{e.response.reason}",
                     )
         return req
 
@@ -129,7 +132,7 @@ class MConnection:
         for user_id in user_ids:
             match = self.user_regex.search(user_id)
             if match:
-                users.append(match.group('username'))
+                users.append(match.group("username"))
         return users
 
     def query_matrix_user(self, user_id):
@@ -155,7 +158,7 @@ class MConnection:
         try:
             req = self._get(
                 self.endpoints["groups_of_room"].format(room_id=quote(room_id)),
-                "Failed to get groups of room."
+                "Failed to get groups of room.",
             )
             return req.json()["groups"]
         except MatrixRequestError as e:
@@ -164,7 +167,7 @@ class MConnection:
             else:
                 raise MatrixRequestError(
                     e,
-                    f"Failed to get groups of room. Status: {e.request.status_code}, Reason:{e.request.reason}"
+                    f"Failed to get groups of room. Status: {e.request.status_code}, Reason:{e.request.reason}",
                 )
 
     def get_rooms_of_group(self, group_id):
@@ -218,10 +221,16 @@ class PolicyConfig:
         oconfig = {
             "corporal": {
                 "schemaVersion": 1,
-                "flags": {"allowCustomUserDisplayNames": True, "allowCustomUserAvatars": True},
+                "flags": {
+                    "allowCustomUserDisplayNames": True,
+                    "allowCustomUserAvatars": True,
+                },
             },
             "deactivate_after": 180,
-            "user_defaults": {"authType": "rest", "authCredential": "http://localhost:8090"},
+            "user_defaults": {
+                "authType": "rest",
+                "authCredential": "http://localhost:8090",
+            },
             "user_mode": "existing",
             "ldap": {
                 "scope": "LEVEL",
@@ -241,6 +250,7 @@ class PolicyConfig:
             "topic": "",
             "preset": "private_chat",
             "creation_content": {"m.federate": False},
+            "managed": True,
         }
         if isinstance(room, dict):
             oroom.update(name=room["room_alias_name"])
@@ -260,10 +270,11 @@ class PolicyConfig:
                 "rooms": group.get("rooms", []),
                 "room_visibility": group.get("room_visibility", "private"),
                 "localpart": localpart,
+                "managed": group.get("managed", True),
                 "data": {
                     "localpart": localpart,
                     "profile": {"name": group.get("name", group["ldap_id"])},
-                }
+                },
             }
         else:
             ogroup = {
@@ -272,6 +283,7 @@ class PolicyConfig:
                 "room_visibility": "private",
                 "rooms": [],
                 "data": {"localpart": group, "profile": {"name": group}},
+                "managed": True,
             }
         return ogroup
 
@@ -306,10 +318,18 @@ class PolicyConfig:
         )
 
     def managed_room_ids(self):
-        return [self.lookup["rooms"][room["room_alias_name"]] for room in self.rooms]
+        return [
+            self.lookup["rooms"][room["room_alias_name"]]
+            for room in self.rooms
+            if room["managed"]
+        ]
 
     def managed_group_ids(self):
-        return [self.lookup["groups"][group["localpart"]] for group in self.groups]
+        return [
+            self.lookup["groups"][group["localpart"]]
+            for group in self.groups
+            if group["managed"]
+        ]
 
     def rebind_ldap(self):
         if not self.ldap_connection.bound:
