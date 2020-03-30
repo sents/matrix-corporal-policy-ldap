@@ -305,6 +305,12 @@ class PolicyConfig:
             self.ldap["url"], self.ldap["binddn"], self.ldap["binddn_pw"]
         )
 
+    def managed_room_ids(self):
+        return [self.lookup["rooms"][room["room_alias_name"]] for room in self.rooms]
+
+    def managed_group_ids(self):
+        return [self.lookup["groups"][group["localpart"]] for group in self.groups]
+
     def rebind_ldap(self):
         if not self.ldap_connection.bound:
             try:
@@ -408,8 +414,8 @@ class PolicyConfig:
         policy = deepcopy(self.corporal)
         users = self.get_users()
         user_policies = [self.user_policy(user) for user in users]
-        room_ids = list(self.lookup["rooms"].values())
-        group_ids = list(self.lookup["groups"].values())
+        room_ids = self.managed_room_ids()
+        group_ids = self.managed_group_ids()
         policy.update(
             {
                 "managedCommunityIds": group_ids,
