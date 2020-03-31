@@ -21,7 +21,7 @@
 	"scope": "LEVEL",
 	"user_base": "ou=People,dc=domain,dc=org",
 	"user_id": "uid",
-	"user_displayame": "cn",
+	"user_displayname": "cn",
 	"group_base": "ou=Groups,dc=domain,dc=org",
 	"group_id": "cn",
 	"group_prefix": "pre_"

@@ -371,13 +371,22 @@ class PolicyConfig:
         if self.ldap["user_filter"] is not None:
             query = "(& {} {})".format(query, self.ldap["user_filter"])
         self.rebind_ldap()
-        self.ldap_connection.search(
-            self.ldap["user_base"],
-            query,
-            attributes=["*"],
-            search_scope=self.ldap["scope"],
-        )
-        users = self.ldap_connection.entries
+        searchparams = {
+            'search_base': self.ldap["user_base"],
+            'search_filter': query,
+            'attributes': ["*"],
+            'search_scope': self.ldap["scope"],
+            'paged_size': 500,
+        }
+        users = []
+        while True:
+            self.ldap_connection.search(**searchparams)
+            users.extend(self.ldap_connection.entries)
+            cookie = self.ldap_connection.result['controls']['1.2.840.113556.1.4.319']['value']['cookie']
+            if cookie:
+                searchparams['paged_cookie'] = cookie
+            else:
+                break
         if self.user_mode == "existing":
             existing_users = self.matrix_connection.get_matrix_users()
             users = [
