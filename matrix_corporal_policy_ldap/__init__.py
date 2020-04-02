@@ -40,7 +40,7 @@ class MatrixRequestError(Exception):
 
 class MConnection:
     endpoints = {
-        "list_users": "/_synapse/admin/v2/users?from=0&guests=false",
+        "list_users": "/_synapse/admin/v2/users?from={from_user}&limit={limit}&guests=false",
         "query_user": "/_synapse/admin/v2/users/{user_id}",
         "create_room": "/_matrix/client/r0/createRoom",
         "create_group": "/_matrix/client/r0/create_group",
@@ -121,10 +121,15 @@ class MConnection:
     def group_id(self, groupname):
         return f"+{groupname}:{self.servername}"
 
-    def get_matrix_users(self):
+    def get_matrix_users(self, limit=100):
         users = []
+        from_value = 0
         while True:
-            req = self._get(self.endpoints["list_users"], "Failed to fetch userlist.")
+            req = self._get(
+                self.endpoints["list_users"].format(from_user=from_value, limit=limit),
+                "Failed to fetch userlist.",
+            )
+            from_value += limit
             user_ids = [
                 userdic["name"]
                 for userdic in req.json()["users"]
@@ -377,19 +382,21 @@ class PolicyConfig:
             query = "(& {} {})".format(query, self.ldap["user_filter"])
         self.rebind_ldap()
         searchparams = {
-            'search_base': self.ldap["user_base"],
-            'search_filter': query,
-            'attributes': ["*"],
-            'search_scope': self.ldap["scope"],
-            'paged_size': 500,
+            "search_base": self.ldap["user_base"],
+            "search_filter": query,
+            "attributes": ["*"],
+            "search_scope": self.ldap["scope"],
+            "paged_size": 500,
         }
         users = []
         while True:
             self.ldap_connection.search(**searchparams)
             users.extend(self.ldap_connection.entries)
-            cookie = self.ldap_connection.result['controls']['1.2.840.113556.1.4.319']['value']['cookie']
+            cookie = self.ldap_connection.result["controls"]["1.2.840.113556.1.4.319"][
+                "value"
+            ]["cookie"]
             if cookie:
-                searchparams['paged_cookie'] = cookie
+                searchparams["paged_cookie"] = cookie
             else:
                 break
         if self.user_mode == "existing":
