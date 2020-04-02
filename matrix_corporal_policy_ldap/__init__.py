@@ -122,17 +122,22 @@ class MConnection:
         return f"+{groupname}:{self.servername}"
 
     def get_matrix_users(self):
-        req = self._get(self.endpoints["list_users"], "Failed to fetch userlist.")
-        user_ids = [
-            userdic["name"]
-            for userdic in req.json()["users"]
-            if not userdic["deactivated"]
-        ]
         users = []
-        for user_id in user_ids:
-            match = self.user_regex.search(user_id)
-            if match:
-                users.append(match.group("username"))
+        while True:
+            req = self._get(self.endpoints["list_users"], "Failed to fetch userlist.")
+            user_ids = [
+                userdic["name"]
+                for userdic in req.json()["users"]
+                if not userdic["deactivated"]
+            ]
+
+            for user_id in user_ids:
+                match = self.user_regex.search(user_id)
+                if match:
+                    users.append(match.group("username"))
+
+            if not req.json().get("next_token"):
+                break
         return users
 
     def query_matrix_user(self, user_id):
