@@ -384,7 +384,7 @@ class PolicyConfig:
         searchparams = {
             "search_base": self.ldap["user_base"],
             "search_filter": query,
-            "attributes": ["*"],
+            "attributes": ["+","*"],
             "search_scope": self.ldap["scope"],
             "paged_size": 500,
         }
